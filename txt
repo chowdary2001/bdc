@@ -1,0 +1,715 @@
+Experiment – 3
+
+AIM: To implement Wordcount Map Reduce program with combiner step using hadoop.
+
+Program :
+import java.io.IOException;
+import java.util.StringTokenizer;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+public class WordCount2 {
+  	public static class TokenizerMapper extends Mapper<Object, Text, Text, IntWritable>{
+    		private final static IntWritable one = new IntWritable(1);
+    		private Text word = new Text();
+    		public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+      			StringTokenizer itr = new StringTokenizer(value.toString());
+      			while (itr.hasMoreTokens()) {
+        				word.set(itr.nextToken());
+        				context.write(word, one);
+      			}
+    		}
+  	}
+  	public static class IntSumReducer extends Reducer <Text,IntWritable,Text,IntWritable> {
+    		private IntWritable result = new IntWritable();
+    		public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+      			int sum = 0;
+      			for (IntWritable val : values) {
+        				sum += val.get();
+      			}
+      			result.set(sum);
+      			context.write(key, result);
+    		}
+  	}
+  	public static void main(String[] args) throws Exception {
+    		Configuration conf = new Configuration();
+    		Job job = Job.getInstance(conf, "word count");
+    		job.setJarByClass(WordCount2.class);
+    		job.setMapperClass(TokenizerMapper.class);
+    		//job.setCombinerClass(IntSumReducer.class);
+    		job.setReducerClass(IntSumReducer.class);
+    		job.setOutputKeyClass(Text.class);
+    		job.setOutputValueClass(IntWritable.class);
+    		FileInputFormat.addInputPath(job, new Path(args[0]));
+    		FileOutputFormat.setOutputPath(job, new Path(args[1]));
+    		System.exit(job.waitForCompletion(true) ? 0 : 1);
+  	} 
+}
+
+Steps to execute the Hadoop application:
+                        
+•	export HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar
+•	hadoop com.suntools.javac.Main WordCount2.java
+•	jar cf wcc.jar WordCount2*.class
+•	hadoop fs -mkdir -p /user/input
+•	hadoop fs -copyFromLocal input  /user/input1
+•	hadoop jar wcc.jar WordCount2 /user/input1 /user/output1
+•	hadoop fs  -cat /user/output1/part-r-00000
+
+----------------------------
+
+Experiment – 4
+AIM: To set up HDFS.
+
+	Configure core-site.xml
+
+Command: sudogeditconf/core-site.xml
+	<property>
+
+<name>fs.default.name</name>
+<value>hdfs://localhost:8020</value>
+</property>
+
+	Configure hdfs-site.xml
+
+Command: sudogeditconf/hdfs-site.xml
+	<property>
+
+<name>dfs.replication</name>
+<value>1</value>
+</property>
+<property>
+<name>dfs.permissions</name>
+<value>false</value>
+</property>
+<property>
+<name>dfs.name.dir</name>
+<value>${Hadoop.tmp.dir}/dfs/name</value></property>
+
+	Configure mapred-site.xml
+
+Command: sudogeditconf/mapred-site.xml
+<property>
+
+<name>mapred.job.tracker</name>
+<value>localhost:8021</value>
+</property>
+
+--------------------------------
+
+Experiment – 5
+AIM: To monitor User Interface using HDFS.
+	
+HDFS Namenode on UI 
+http://locahost:50070/
+HDFS Jobtracker
+http://locahost:50030
+HDFS Tasktracker
+http://locahost:50060/
+HDFS Logs 
+http://locahost:50070/logs/
+
+------------------------------
+
+Hadoop Map Reduce Applications
+Experiment –10
+
+AIM: To Choose appropriate Hadoop data types.
+
+Hadoop uses the Writable interface based classes as the data types for the Map Reduce computations. These data types are used throughout the map reduce computational flow, starting with reading the input data, transferring intermediate data between Map and Reduce tasks, and finally, when writing output data. 
+In order to be used as a value data type of a Map Reduce computation, a data type must implement the org.apache.hadoop.io.Writable interface. The Writable interface defines how hadoop should serialize or deserialize the values transmitting and storing the data.
+
+Some of primitive data types provided by hadoop:
+
+Hadoop	java
+IntWritable	int
+LongWritable	long
+BooleanWritable	boolean
+FloatWritable	float
+ByteWritable	byte
+Text	String
+	
+
+Configure the input and output data types of your Hadoop Map Reduce application:
+
+Specify the data types for the input (key: LongWritable, value: Text) and 
+output (key: Text,value: IntWritable) key-value pairs of your mapper using the generic-type variables.
+
+public class SampleMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
+public void map(LongWritable key, Text value, Context context) … {
+}
+
+Specify the data types for the input (key: Text, value: IntWritable) and output (key: Text, value: IntWritable) key-value pairs of your reducer using the generic-type variables. The reducer's input key-value pair data types should match the mapper's output key-value pairs.
+
+public class Reduce extends Reducer<Text, IntWritable, Text, IntWritable> {
+public void reduce(Text key, Iterable<IntWritable> values, Context context) {
+	}	
+}
+
+Specify the output data types of the Map Reduce computation using the Job object as shown in the following code snippet.
+
+Job job = new Job(..);
+job.setOutputKeyClass(Text.class);
+job.setOutputValueClass(IntWritable.class);
+
+-----------------------------------
+
+Exercise 11
+
+AIM: To Implement a custom Hadoop Writable data type.
+There can be use cases where none of the built-in data types matches your requirements or a custom data type optimized for your use case may perform better than a Hadoop built-in data type. In such scenarios, we can easily write a custom Writable data type by implementing the org.apache.hadoop.io.Writable Interface to define the serialization format of your data type.
+
+Program to implement custom datatypes:
+
+public static class CustomWritable implements WritableComparable<CustomWritable> { 
+private Text siteURL;
+private IntWritable reqNo;
+
+//Default Constructor
+public CustomWritable() {
+this.siteURL = new Text();
+this.reqNo = new IntWritable();
+}
+
+//Custom Constructor
+public CustomWritable(IntWritable reqno, Text url) { 
+this.siteURL = url;
+this.reqNo = reqno;
+}
+
+//Setter method to set the values of CustomWritable object 
+public void set(IntWritable reqno, Text url) {
+this.siteURL = url;
+this.reqNo = reqno;
+}
+
+//to get IP address from WebLog Record
+public Text getWord() {
+return siteURL;
+}
+
+@Override
+//overriding default readFields method.
+//It de-serializes the byte stream data
+public void readFields(DataInput in) throws IOException {
+reqNo.readFields(in);
+siteURL.readFields(in);
+}
+@Override
+//It serializes object data into byte stream data
+public void write(DataOutput out) throws IOException { 
+reqNo.write(out);
+siteURL.write(out);
+}
+
+@Override
+public int compareTo(CustomWritable o) {
+if (siteURL.compareTo(o.siteURL)==0){
+return (reqNo.compareTo(o.reqNo));
+}
+else return (siteURL.compareTo(o.siteURL));
+}
+@Override
+public boolean equals(Object o) {
+if (o instanceof CustomWritable){
+CustomWritable other = (CustomWritable) o;
+return siteURL.equals(other.siteURL) && reqNo.equals(other.reqNo);
+}
+return false;
+}
+@Override
+public int hashCode() {
+return siteURL.hashCode();
+}
+}
+
+
+---------------------------
+
+Experiment –12
+
+AIM: To Implement a custom Hadoop key type.
+
+The instances of Hadoop MapReduce key types should have the ability to compare against each other for sorting purposes. In order to be used as a key type in a MapReduce a computation, a Hadoop Writable data type should implement the org.apache.hadoop.io.WritableComparable<T> interface. The WritableComparable interface extends the org.apache.hadoop.io.Writable interface and adds the compareTo() method to perform the comparisons.
+
+The following are the steps to implement custom hadoop writable data types for WordCount Program:
+
+Step 1:
+public static class CustomMapper extends Mapper <Object, Text, CustomWritable,
+IntWritable> {
+}
+Step 2:
+public static class CustomReducer extends Reducer < CustomWritable, IntWritable,
+Text, IntWritable> {
+}
+Step 3:
+Job job = new Job();
+job.setOutputKeyClass(Text.class);
+job.setOutputValueClass(IntWritable.class);
+job.setMapOutputKeyClass(CustomWritable.class);
+job.setMapOutputValueClass(IntWritable.class);
+
+-------------------------------
+
+Experiment –13
+
+AIM: To emit data of different value types from a mapper.
+
+Emitting data products belonging to multiple value types from a mapper is useful when performing reducer-side joins as well as when we need to avoid the complexity of having multiple MapReduce computations to summarize different types of properties in a data set. However, Hadoop reducers do not allow multiple input value types. In these scenarios, we can use the Generic Writable class to wrap multiple value instances belonging to different data types.
+
+
+The following are the steps to emitting data of different value types from a Mapper:
+
+Step 1:
+public class MultiValueWritable extends GenericWritable { 
+private static Class[] CLASSES = new Class[]{
+IntWritable.class;
+Text.class;
+};
+public MultiValueWritable(){
+}
+public MultiValueWritable(Writable value){
+set(value);
+}
+protected Class[] getTypes() {
+return CLASSES;
+}
+}
+Step 2:
+public class LogProcessorMap extends Mapper<Object, Text, Text, MultiValueWritable> {
+private Text userHostText = new Text();
+private Text requestText = new Text();
+private IntWritableresponseSize = new IntWritable(); 
+public void map(Object key, Text value,Context context)…{
+……// parse the value (log entry) using a regex.
+userHostText.set(userHost);
+requestText.set(request);
+bytesWritable.set(responseSize);
+context.write(userHostText,newMultiValueWritable(requestText));
+context.write(userHostText,newMultiValueWritable(responseSize));
+}
+}
+
+Step 3:
+public class LogProcessorMap extends Reducer<Text, MultiValueWritable,Text,Text> {
+private Text result = new Text();
+public void reduce(Text key,Iterable<MultiValueWritable> values, Context context)…{
+int sum = 0;
+StringBuilder requests = new StringBuilder();
+for (MultiValueWritable multiValueWritable : values) { 
+Writable writable = multiValueWritable.get();
+
+if (writable instanceof IntWritable){
+sum += ((IntWritable)writable).get();
+}
+else{
+requests.append(((Text)writable).toString());
+requests.append("\t");
+}
+}
+result.set(sum + "\t"+requests);
+context.write(key, result);
+}
+}
+
+Step 4:
+Configuration conf = new Configuration(); 
+Job job = new Job(conf, "log-analysis");
+…
+job.setMapOutputValueClass(MultiValueWritable.class);
+
+---------------------------------
+
+Experiment –14
+
+AIM: To Choose a suitable Hadoop Input Format for your input data format
+
+Hadoop supports processing of many different formats and types of data through InputFormat. The InputFormat of a Hadoop MapReduce computation generates the key-value pair inputs for the mappers by parsing the input data. 
+InputFormat also performs the splitting of the input data into logical partitions, essentially determining the number of Map tasks of a MapReduce computation and indirectly deciding the execution location of the Map tasks. 
+Hadoop generates a map task for each logical data partition and invokes the respective mappers with the key-value pairs of the logical splits as the input.
+
+The following steps show you how to use FileInputFormat based KeyValueTextInputFormat as InputFormat for a Hadoop MapReduce computation.
+
+1.	In this example, we are going to specify the KeyValueTextInputFormat as InputFormat for a Hadoop MapReduce computation using the Job object as follows:
+
+Configuration conf = new Configuration();
+Job job = new Job(conf, "log-analysis");
+……
+job.SetInputFormat(KeyValueTextInputFormat.class)
+
+2.Set the input paths to the job.
+
+FileInputFormat.setInputPaths(job, new Path(inputPath));
+
+
+--------------------------
+
+Experiment –15
+
+AIM: To Format the results of Map Reduce Computation using Hadoop Output Formats.
+
+Hadoop uses the org.apache.hadoop.mapreduce.lib.output.TextOutputFormat<K,V> as the default OutputFormat for the MapReduce computations. TextOutputFormat writes the records of the output data to plain text files in HDFS using a separate line for each record. 
+TextOutputFormat uses the tab character to delimit between the key and the value of a record. TextOutputFormat extends FileOutputFormat, which is the base class for all file-based output formats.
+
+
+The following steps show you how to use the FileOutputFormat based SequenceFileOutputFormat as the OutputFormat for a Hadoop MapReduce computation.
+
+
+1.	In this example, we are going to specify the org.apache.hadoop.mapreduce.lib.output.
+	SequenceFileOutputFormat<K,V> as the OutputFormat for a Hadoop MapReduce 	computa-tion using the Job object as follows: 
+
+	Configuration conf = new Configuration();
+	Job job = new Job(conf, "log-analysis");
+	……
+	job.setOutputFormat(SequenceFileOutputFormat.class)
+
+
+2.	Set the output paths to the job.
+	FileOutputFormat.setOutputPath(job, new Path(outputPath));
+
+-------------------------------------
+
+Experiment –16
+
+AIM:  To perform Simple analytics using Map Reduce.
+
+PROGRAM: 
+              
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.GenericOptionsParser;
+
+public class WebLogMessageSizeAggregator {
+public static final Pattern httplogPattern = Pattern.compile("([^\\s]+) - - \\[(.+)\\] \"([^\\s]+) 	(/[^\\s]*) HTTP/[^\\s]+\" [^\\s]+ ([0-9]+)");
+public static class AMapper extends Mapper<Object, Text, Text, IntWritable> {
+public void map(Object key, Text value, Context context) throws IOException, 	In-terruptedException {
+            		Matcher matcher = httplogPattern.matcher(value.toString());
+            		if (matcher.matches()) {
+                			int size = Integer.parseInt(matcher.group(5));
+                			context.write(new Text("msgSize"), new IntWritable(size));
+            		}
+        		}
+    	}
+
+   	 public static class AReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+        		public void reduce(Text key, Iterable<IntWritable> values, Context context) 			throws IOException,InterruptedException {
+            		double tot = 0;
+            		int count = 0;
+            		int min = Integer.MAX_VALUE;
+            		int max = 0;
+            		Iterator<IntWritable> iterator = values.iterator();
+            		while (iterator.hasNext()) {
+                			int value = iterator.next().get();
+                			tot = tot + value;
+                			count++;
+               			if (value < min) {
+                    				min = value;
+                			}
+                			
+if (value > max) {
+                    				max = value;
+                			}
+            		}
+            		context.write(new Text("Mean"), new IntWritable((int) tot / count));
+            		context.write(new Text("Max"), new IntWritable(max));
+            		context.write(new Text("Min"), new IntWritable(min));
+        		}
+    	}
+public static void main(String[] args) throws Exception {
+        		JobConf conf = new JobConf();
+        		String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
+        		if (otherArgs.length != 2) {
+            		System.err.println("Usage: <in> <out>");
+            		System.exit(2);
+        		}
+        	Job job = new Job(conf, "WebLogMessageSizeAggregator");
+        	job.setJarByClass(WebLogMessageSizeAggregator.class);
+        	job.setMapperClass(AMapper.class);
+        	job.setReducerClass(AReducer.class);
+        	job.setMapOutputKeyClass(Text.class);
+        	job.setMapOutputValueClass(IntWritable.class);
+        	FileInputFormat.addInputPath(job, new Path(otherArgs[0]));
+       	FileOutputFormat.setOutputPath(job, new Path(otherArgs[1]));
+        	System.exit(job.waitForCompletion(true) ? 0 : 1);
+    }
+}
+
+Steps to execute the Hadoop application:
+
+•	export HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar
+•	hadoop com.suntools.javac.Main WebLogMessageSizeAggregator.java
+•	jar cf wcc.jar WebLogMessageSizeAggregator *.class
+•	hadoop fs -mkdir -p /user/input
+•	hadoop fs -copyFromLocal input  /user/input1
+•	hadoop jar wcc.jar WebLogMessageSizeAggregator /user/input1 /user/output1
+•	hadoop fs  -cat /user/output1/part-r-00000
+
+
+------------------------------------
+
+Experiment –17
+
+AIM:  Performing Group-By using Map Reduce.
+
+PROGRAM: 
+
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.GenericOptionsParser;
+
+public class WeblogHitsByLinkProcessor  {
+public static final Pattern httplogPattern = Pattern.compile("([^\\s]+) - - \\[(.+)\\\"([^\\s]+)
+(/[^\\s]*)HTTP/[^\\s]+\" [^\\s]+ ([0-9]+)");
+public static class AMapper extends Mapper<Object, Text, Text, IntWritable> {
+private final static IntWritable one = new IntWritable(1);
+private Text word = new Text();
+public void map(Object key, Text value, Context context) throws IOException, 			  InterruptedException {
+            		Matcher matcher = httplogPattern.matcher(value.toString());
+            			if (matcher.matches()) {
+                				String linkUrl = matcher.group(4);
+                			word.set(linkUrl);
+                			context.write(word, one);
+            		}
+        		}
+    	}
+   	public static class AReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+private IntWritable result = new IntWritable();
+public void reduce(Text key, Iterable<IntWritable> values, Context context) 	throws IOException,InterruptedException {
+            		int sum = 0;
+            		for (IntWritable val : values) {
+                			sum += val.get();
+            		}
+            	result.set(sum);
+            	context.write(key, result);
+        		}
+}
+public static void main(String[] args) throws Exception {
+JobConf conf = new JobConf();
+
+String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
+        		if (otherArgs.length != 2) {
+            		System.err.println("Usage: <in> <out>");
+            		System.exit(2);
+        		}
+        	Job job = new Job(conf, "WeblogHitsByLinkProcessor ");
+        	job.setJarByClass(WeblogHitsByLinkProcessor .class);
+        	job.setMapperClass(AMapper.class);
+        	job.setReducerClass(AReducer.class);
+        	job.setMapOutputKeyClass(Text.class);
+        	job.setMapOutputValueClass(IntWritable.class);
+        	FileInputFormat.addInputPath(job, new Path(otherArgs[0]));
+        	FileOutputFormat.setOutputPath(job, new Path(otherArgs[1]));
+        	System.exit(job.waitForCompletion(true) ? 0 : 1);
+    	}
+}
+
+Steps to execute the Hadoop application:
+
+•	export HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar
+•	hadoop com.suntools.javac.Main WeblogHitsByLinkProcessor.java
+•	jar cf wcc.jar WeblogHitsByLinkProcessor *.class
+•	hadoop fs -mkdir -p /user/input
+•	hadoop fs -copyFromLocal input  /user/input1
+•	hadoop jar wcc.jar WeblogHitsByLinkProcessor /user/input1 /user/output1
+•	hadoop fs  -cat /user/output1/part-r-00000
+
+--------------------------
+
+Experiment –18
+
+AIM:  Calculating frequency distributions and sorting using Map Reduce.
+
+PROGRAM: 
+
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.GenericOptionsParser;
+
+
+public class frequency  {
+public static final Pattern httplogPattern = Pattern.compile("([^\\s]+) - - \\[(.+)\\] \"([^\\s]+) 	(/[^\\s]*) HTTP/[^\\s]+\" [^\\s]+ ([0-9]+)");
+public static class AMapper extends Mapper<Object, Text, Text, IntWritable> {
+private final static IntWritable one = new IntWritable(1);
+private Text word = new Text();
+public void map(Object key, Text value, Context context) throws IOException, 	In-terruptedException {
+Matcher matcher = httplogPattern.matcher(value.toString());
+            		if (matcher.matches()) {
+                			String linkUrl = matcher.group(4);
+              			word.set(linkUrl);
+               			context.write(word, one);
+            		}
+        		}
+    	}
+public static class AReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+private IntWritable result = new IntWritable();
+public void reduce(Text key, Iterable<IntWritable> values, Context context) 	throws IOException,InterruptedException {
+            		int sum = 0;
+            		for (IntWritable val : values) {
+                			sum += val.get();
+            		}
+            	result.set(sum);
+            	context.write(key, result);
+        		}
+}
+public static void main(String[] args) throws Exception {
+
+JobConf conf = new JobConf();
+        		String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
+        		if (otherArgs.length != 2) {
+            		System.err.println("Usage: <in> <out>");
+            		System.exit(2);
+        		}
+Job job = new Job(conf, "frequency ");
+        	job.setJarByClass(WeblogHitsByLinkProcessor .class);
+        	job.setMapperClass(AMapper.class);
+        	job.setReducerClass(AReducer.class);
+        	job.setMapOutputKeyClass(Text.class);
+        	job.setMapOutputValueClass(IntWritable.class);
+        	FileInputFormat.addInputPath(job, new Path(otherArgs[0]));
+        	FileOutputFormat.setOutputPath(job, new Path(otherArgs[1]));
+        	System.exit(job.waitForCompletion(true) ? 0 : 1);
+    	}
+}
+
+Steps to execute the Hadoop application:
+
+•	export HADOOP_CLASSPATH=${JAVA_HOME}/lib/tools.jar
+•	hadoop com.suntools.javac.Main frequency.java
+•	jar cf wcc.jar frequency *.class
+•	hadoop fs -mkdir -p /user/input
+•	hadoop fs -copyFromLocal input  /user/input1
+•	hadoop jar wcc.jar frequency /user/input1 /user/output1
+•	hadoop fs  -cat /user/output1/part-r-00000
+
+------------------------------
+
+Experiment –19
+
+AIM:  Plotting the Hadoop results using GNU Plot
+
+
+Download the results of the last recipe to a local computer by running the following 
+command
+> hadoop fs -get /data/output4/part-r-00000 2.data
+> sudo gedit httpfreqdist.plot
+set terminal png
+set output "freqdist.png"
+
+set title "Frequnecy Distribution of Hits by Url";
+set ylabel "Number of Hits";
+set xlabel "Urls (Sorted by hits)";
+set key left top
+set log y
+set log x
+
+plot "2.data" using 2 title "Frequency" with linespoints
+
+>gnuplot httpfreqdist.plot
+
+--------------------
+
+Experiment –20
+
+AIM:  Calculating histograms using Map Reduce.		
+
+
+Histograms are a common visualization technique that gives an empirical estimate of the probability density function (pdf) of a variable. Histograms are well-suited to a big data environment, because they can reduce the size of raw input data to a vector of counts. Each count is the number of observations that falls within each of a set of contiguous, numeric intervals or bins.
+The mapreduce function computes counts separately on multiple chunks of the data.
+Then mapreduce sums the counts from all chunks. The map function and reduce function are both
+extremely simple in this example. Nevertheless, you can build flexible visualizations with the summary information that they collect.
+
+Visualize Results:
+
+Plot the raw bin counts using the whole range of the data in gnuplot by using following commands having input from previous program output i.e., 2.data
+
+set term png medium
+set output “histogram.png”
+set xlabel “number of bits”
+set ylabel “urls”
+set style histogram clustered gap 2
+set style histogram columnstacked
+set boxwidth 0.9 relative
+set style data histograms
+set style fill solid 1.0 border-1
+plot “2.data” using 1, “2.data” using 2
+
+-------------------------
+
+Experiment –21
+
+AIM:  Calculating scatter plots using Map Reduce.
+
+Another useful tool while analyzing data is a Scatter plot: scatter plot is used to find the
+relationship between two measurements (dimensions). It plots the two dimensions against
+each other.
+
+The following code segment shows the code for the mapper.
+
+public void map(Object key, Text value, Context context) throws IOException,
+InterruptedException{
+Matcher matcher = httplogPattern.matcher(value.toString());
+if (matcher.matches()){
+int size = Integer.parseInt(matcher.group(5));
+context.write(new IntWritable(size / 1024), one);
+}
+}
+
+Map task receives each line in the log files as a different key-value pair. It parse the lines using regularexpressions and emits the file size as 1024-bytes blocks as the key and one as the values. Then, Hadoop collects the key-value pairs. sorts them, and then invokes the reducer once for each key. Each reducer walks through the values and calculates the count of page accesses for each file size.
+
+public void reduce(IntWritable key, Iterable values, Context context) throws IOException,
+InterruptedException{
+int sum = 0;
+for (IntWritableval : values){
+sum += val.get();
+}
+context.write(key, new IntWritable(sum));
+}
+
+The following commands are used for plotter graph between the size of the web pages and the number of hits received by the web page  in gnuplot set logx plot “2.data” using1:2title “2Node” with points.
+
+
+
+
+
+
+
